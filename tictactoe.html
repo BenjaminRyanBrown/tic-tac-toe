@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #e94560;
+    }
+
+    #status {
+      font-size: 1.2rem;
+      min-height: 1.6rem;
+      color: #a8dadc;
+    }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      grid-template-rows: repeat(3, 110px);
+      gap: 8px;
+    }
+
+    .cell {
+      background: #16213e;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .cell:hover:not(.taken) {
+      background: #0f3460;
+      transform: scale(1.05);
+    }
+
+    .cell.x { color: #e94560; }
+    .cell.o { color: #a8dadc; }
+
+    .cell.win {
+      background: #0f3460;
+      animation: pulse 0.4s ease;
+    }
+
+    @keyframes pulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
+    #controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.85; }
+
+    #reset-btn {
+      background: #e94560;
+      color: #fff;
+    }
+
+    #mode-btn {
+      background: #0f3460;
+      color: #a8dadc;
+      border: 1px solid #a8dadc;
+    }
+
+    #score {
+      display: flex;
+      gap: 32px;
+      font-size: 1rem;
+      color: #aaa;
+    }
+
+    #score span { font-weight: bold; color: #eee; }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe</h1>
+
+  <div id="score">
+    X wins: <span id="score-x">0</span>
+    &nbsp;|&nbsp;
+    Draws: <span id="score-d">0</span>
+    &nbsp;|&nbsp;
+    O wins: <span id="score-o">0</span>
+  </div>
+
+  <div id="status">X's turn</div>
+
+  <div id="board">
+    <div class="cell" data-i="0"></div>
+    <div class="cell" data-i="1"></div>
+    <div class="cell" data-i="2"></div>
+    <div class="cell" data-i="3"></div>
+    <div class="cell" data-i="4"></div>
+    <div class="cell" data-i="5"></div>
+    <div class="cell" data-i="6"></div>
+    <div class="cell" data-i="7"></div>
+    <div class="cell" data-i="8"></div>
+  </div>
+
+  <div id="controls">
+    <button id="mode-btn">Mode: 2 Players</button>
+    <button id="reset-btn">New Game</button>
+  </div>
+
+  <script>
+    const cells = document.querySelectorAll('.cell');
+    const status = document.getElementById('status');
+    const resetBtn = document.getElementById('reset-btn');
+    const modeBtn = document.getElementById('mode-btn');
+    const scoreX = document.getElementById('score-x');
+    const scoreO = document.getElementById('score-o');
+    const scoreD = document.getElementById('score-d');
+
+    const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+    let board, current, gameOver, vsAI;
+    let scores = { X: 0, O: 0, D: 0 };
+    vsAI = false;
+
+    function init() {
+      board = Array(9).fill('');
+      current = 'X';
+      gameOver = false;
+      cells.forEach(c => {
+        c.textContent = '';
+        c.className = 'cell';
+      });
+      status.textContent = vsAI ? "Your turn (X)" : "X's turn";
+    }
+
+    function checkWinner(b) {
+      for (const [a, bI, c] of WINS) {
+        if (b[a] && b[a] === b[bI] && b[a] === b[c]) return { winner: b[a], line: [a, bI, c] };
+      }
+      if (b.every(v => v)) return { winner: 'draw' };
+      return null;
+    }
+
+    function handleClick(i) {
+      if (gameOver || board[i]) return;
+      if (vsAI && current === 'O') return;
+
+      place(i, current);
+      const result = checkWinner(board);
+      if (result) { endGame(result); return; }
+
+      current = current === 'X' ? 'O' : 'X';
+      status.textContent = vsAI ? (current === 'X' ? "Your turn (X)" : "AI thinking...") : `${current}'s turn`;
+
+      if (vsAI && current === 'O') {
+        setTimeout(aiMove, 400);
+      }
+    }
+
+    function place(i, player) {
+      board[i] = player;
+      cells[i].textContent = player;
+      cells[i].classList.add(player.toLowerCase(), 'taken');
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+      const move = bestMove();
+      place(move, 'O');
+      const result = checkWinner(board);
+      if (result) { endGame(result); return; }
+      current = 'X';
+      status.textContent = "Your turn (X)";
+    }
+
+    function bestMove() {
+      // Try to win, then block, then center, then random
+      for (const player of ['O', 'X']) {
+        for (let i = 0; i < 9; i++) {
+          if (!board[i]) {
+            board[i] = player;
+            if (checkWinner(board)?.winner === player) { board[i] = ''; return i; }
+            board[i] = '';
+          }
+        }
+      }
+      if (!board[4]) return 4;
+      const corners = [0,2,6,8].filter(i => !board[i]);
+      if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+      const empty = board.map((v,i) => v ? null : i).filter(i => i !== null);
+      return empty[Math.floor(Math.random() * empty.length)];
+    }
+
+    function endGame(result) {
+      gameOver = true;
+      if (result.winner === 'draw') {
+        status.textContent = "It's a draw!";
+        scores.D++;
+        scoreD.textContent = scores.D;
+      } else {
+        const label = vsAI ? (result.winner === 'X' ? 'You win!' : 'AI wins!') : `${result.winner} wins!`;
+        status.textContent = label;
+        result.line.forEach(i => cells[i].classList.add('win'));
+        scores[result.winner]++;
+        if (result.winner === 'X') scoreX.textContent = scores.X;
+        else scoreO.textContent = scores.O;
+      }
+    }
+
+    cells.forEach(c => c.addEventListener('click', () => handleClick(+c.dataset.i)));
+    resetBtn.addEventListener('click', init);
+    modeBtn.addEventListener('click', () => {
+      vsAI = !vsAI;
+      modeBtn.textContent = vsAI ? 'Mode: vs AI' : 'Mode: 2 Players';
+      init();
+    });
+
+    init();
+  </script>
+</body>
+</html>
